@@ -33,8 +33,8 @@ O fluxo de dados segue o padrão moderno de IA generativa:
 
 1. **Clone o repositório:**
    ```bash
-   git clone [https://github.com/seu-usuario/seu-repositorio.git](https://github.com/seu-usuario/seu-repositorio.git)
-   cd seu-repositorio
+   git clone [https://github.com/luizadorr/chatbot-rag.git](https://github.com/luizadorr/chatbot-rag.git)
+   cd chatbot-rag
 
 
 2. **Configure as Variáveis de Ambiente:**
