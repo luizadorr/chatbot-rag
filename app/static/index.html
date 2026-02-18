@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot RAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #chat-box {
+            height: 500px;
+            overflow-y: auto;
+            background-color: #fcfcfc;
+        }
+        .message {
+            max-width: 85%;
+            margin-bottom: 1rem;
+            padding: 0.8rem 1.2rem;
+            border-radius: 1rem;
+        }
+        .user-msg { align-self: flex-end; }
+        .bot-msg { align-self: flex-start; }
+        /* Botões de sugestão estilo pill */
+        .sugestao-pill {
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .sugestao-pill:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+    <div class="row g-4">
+        
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="card-title mb-0">Filtros</h5>
+                </div>
+                <div class="card-body">
+                    <label class="form-label fw-bold">Setor de Busca:</label>
+                    <select id="setor-select" class="form-select mb-4">
+                        <option value="geral">Geral</option>
+                        <option value="financeiro">Financeiro</option>
+                        <option value="rh">Recursos Humanos</option>
+                        <option value="ti">TI</option>
+                    </select>
+
+                    <hr>
+                    <label class="form-label fw-bold">Documentos na Memória:</label>
+                    <div id="lista-arquivos" class="list-group mb-3" style="max-height: 200px; overflow-y: auto;">
+                        <small class="text-muted">Nenhum arquivo encontrado.</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary w-100 mb-3" onclick="atualizarListaArquivos()">
+                        Atualizar Lista
+                    </button>
+
+                    <label class="form-label fw-bold">Treinar Novo PDF:</label>
+                    <div class="input-group mb-2">
+                        <input type="file" id="pdf-file" class="form-control" accept=".pdf">
+                    </div>
+                    <button class="btn btn-outline-success w-100" onclick="uploadPDF()">
+                        Subir para o Setor
+                    </button>
+                    <div id="upload-status" class="small mt-2"></div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info shadow-sm small">
+                <strong>Dica:</strong> A IA buscará apenas documentos vinculados ao setor selecionado acima.
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-primary">Chatbot RAG</h5>
+                </div>
+
+                <div id="chat-box" class="card-body d-flex flex-column border-bottom">
+                    <div class="message bot-msg bg-primary text-white shadow-sm">
+                        Olá! Sou o seu motor RAG. Selecione um setor e comece a perguntar sobre os documentos.
+                    </div>
+                </div>
+
+                <div class="card-footer bg-white p-3">
+                    <div id="loading" class="text-center mb-2 d-none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2 small text-muted">Processando conhecimento...</span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="text" id="user-input" class="form-control" placeholder="O que deseja saber?">
+                        <button class="btn btn-primary px-4" onclick="sendMessage()">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const loading = document.getElementById('loading');
+    const setorSelect = document.getElementById('setor-select');
+
+    // --- FUNÇÃO DE ENVIO DE MENSAGEM ---
+    async function sendMessage(text = null) {
+        const message = text || userInput.value;
+        if (!message) return;
+
+        appendMessage(message, 'user-msg bg-dark text-white');
+        userInput.value = '';
+        loading.classList.remove('d-none');
+
+        try {
+            const response = await fetch('/perguntar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    prompt: message, 
+                    setor: setorSelect.value 
+                })
+            });
+
+            const data = await response.json();
+            if (data.ok) {
+                renderBotResponse(data.output);
+            } else {
+                appendMessage("Erro: " + data.error, 'bot-msg bg-danger text-white');
+            }
+        } catch (error) {
+            appendMessage("Erro de conexão com o servidor.", 'bot-msg bg-danger text-white');
+        } finally {
+            loading.classList.add('d-none');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    async function atualizarListaArquivos() {
+        const setor = document.getElementById('setor-select').value;
+        const listaDiv = document.getElementById('lista-arquivos');
+        
+        try {
+            const response = await fetch(`/arquivos?setor=${setor}`);
+            const data = await response.json();
+            
+            listaDiv.innerHTML = ""; 
+            
+            if (data.arquivos.length === 0) {
+                listaDiv.innerHTML = '<small class="text-muted">Nenhum arquivo neste setor.</small>';
+                return;
+            }
+
+            data.arquivos.forEach(nome => {
+                const item = document.createElement('div');
+                item.className = "list-group-item list-group-item-action py-1 px-2 small d-flex justify-content-between align-items-center";
+                item.style.cursor = "pointer";
+                item.innerHTML = `
+                    <span>📄 ${nome}</span>
+                    <span class="badge bg-light text-dark border">Selecionar</span>
+                `;
+                item.onclick = () => {
+                    document.getElementById('user-input').value = `Escreva o que gostaria de perguntar aqui ${nome}`;
+                    document.getElementById('user-input').focus();
+                };
+                listaDiv.appendChild(item);
+            });
+        } catch (e) {
+            console.error("Erro ao listar arquivos", e);
+        }
+    }
+
+    document.getElementById('setor-select').addEventListener('change', atualizarListaArquivos);
+
+    window.onload = atualizarListaArquivos;
+
+
+    // --- FUNÇÃO DE UPLOAD ---
+    async function uploadPDF() {
+        const fileInput = document.getElementById('pdf-file');
+        const status = document.getElementById('upload-status');
+        const setor = setorSelect.value;
+
+        if (!fileInput.files[0]) return alert("Selecione um arquivo PDF primeiro!");
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        status.innerHTML = '<span class="text-primary animate-pulse">Enviando arquivo...</span>';
+
+        try {
+            const response = await fetch(`/upload?setor=${setor}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.ok) {
+                status.innerHTML = '<span class="text-success fw-bold">✅ Documento integrado!</span>';
+                fileInput.value = '';
+            } else {
+                status.innerHTML = '<span class="text-danger">❌ Falha no processamento.</span>';
+            }
+        } catch (e) {
+            status.innerHTML = '<span class="text-danger">❌ Erro de conexão.</span>';
+        }
+    }
+
+    function appendMessage(text, className) {
+        const div = document.createElement('div');
+        div.className = `message shadow-sm ${className}`;
+        div.innerText = text;
+        chatBox.appendChild(div);
+    }
+
+    function renderBotResponse(rawText) {
+        const sugestaoRegex = /\[\[ (.*?) \]\]/g;
+        let cleanText = rawText.replace(sugestaoRegex, '');
+        let matches = [...rawText.matchAll(sugestaoRegex)];
+
+        const div = document.createElement('div');
+        div.className = 'message bot-msg bg-white border shadow-sm text-dark';
+        div.innerHTML = cleanText.replace(/\n/g, '<br>');
+
+        if (matches.length > 0) {
+            const sugContainer = document.createElement('div');
+            sugContainer.className = 'mt-3 pt-2 border-top';
+            
+            matches.forEach(match => {
+                const btn = document.createElement('span');
+                btn.className = 'badge rounded-pill bg-light text-primary border border-primary me-2 p-2 sugestao-pill';
+                btn.innerText = match[1].split('|')[0].trim();
+                btn.onclick = () => sendMessage(btn.innerText);
+                sugContainer.appendChild(btn);
+            });
+            div.appendChild(sugContainer);
+        }
+
+        chatBox.appendChild(div);
+    }
+
+    userInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
+</script>
+</body>
+</html>

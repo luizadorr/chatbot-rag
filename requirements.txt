@@ -1,0 +1,20 @@
+# Servidor e API
+fastapi
+uvicorn
+pydantic
+python-multipart    
+
+# Inteligência Artificial e RAG
+langchain
+langchain-community
+langchain-huggingface
+langchain-text-splitters
+langchain-chroma      
+groq
+
+# Processamento de Documentos
+pypdf
+sentence-transformers
+
+# Utilidades
+python-dotenv
