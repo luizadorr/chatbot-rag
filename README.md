@@ -75,19 +75,3 @@ Abra [http://localhost:8000]()
 * `/docs/`: Volumes mapeados onde os PDFs são salvos por setor.
 * `/data/`: Persistência do banco de dados vetorial.
 
-
----
-
-### Dica para o GitHub:
-Além do README, não se esqueça de criar um arquivo `.gitignore` para evitar subir arquivos inúteis ou sensíveis:
-
-```text
-# .gitignore
-.env
-__pycache__/
-data/
-.pytest_cache/
-*.pyc
-.DS_Store
-
-```
